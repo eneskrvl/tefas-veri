@@ -1,1 +1,2 @@
-tefas-crawler
+requests
+pandas
