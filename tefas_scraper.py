@@ -1,54 +1,35 @@
 import asyncio
 from playwright.async_api import async_playwright
 import pandas as pd
-from datetime import datetime
-import os
 
-OUTPUT_FILE = "tefas_gunluk.csv"
-FUND_CODE = "HKH"
-TEFAS_URL = f"https://www.tefas.gov.tr/FonAnaliz.aspx?FonKod={FUND_CODE}"
-
-async def get_fund_data():
+async def get_hkh_data():
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch()
         page = await browser.new_page()
-        print(f"Sayfa açılıyor: {TEFAS_URL}")
-        await page.goto(TEFAS_URL, timeout=60000)
+        await page.goto("https://www.tefas.gov.tr/FonAnaliz.aspx?FonKod=HKH")
 
         try:
-            await page.wait_for_selector("#MainContent_PanelPortfoy", timeout=60000)
-            print("Sayfa yüklendi.")
+            await page.wait_for_selector("#MainContent_portfoyBilgileri", timeout=60000)
+
+            # Tarih ve fiyat çek
+            tarih = await page.inner_text("#MainContent_lblTarih")
+            fiyat = await page.inner_text("#MainContent_lblBirimPayDegeri")
+
+            data = {
+                "code": ["HKH"],
+                "title": ["Hedef Portföy Değişken Fon"],
+                "date": [tarih],
+                "unitPrice": [fiyat.replace(",", ".")]
+            }
+
+            df = pd.DataFrame(data)
+            df.to_csv("tefas_gunluk.csv", index=False)
+
+            print("✅ Veri başarıyla çekildi.")
         except Exception as e:
-            print(f"Sayfa yüklenemedi: {e}")
+            print(f"❌ Hata oluştu: {e}")
+        finally:
             await browser.close()
-            raise
-
-        try:
-            price = await page.inner_text("#MainContent_lblFonFiyat")
-            date = await page.inner_text("#MainContent_lblFiyatTarih")
-            name = await page.inner_text("#MainContent_lblFonUnvan")
-
-            df = pd.DataFrame([{
-                "code": FUND_CODE,
-                "title": name.strip(),
-                "date": date.strip(),
-                "unitPrice": price.strip()
-            }])
-
-            df.to_csv(OUTPUT_FILE, index=False)
-            print("Veri başarıyla CSV'ye yazıldı.")
-
-        except Exception as e:
-            print(f"Veri çekme hatası: {e}")
-            await browser.close()
-            raise
-
-        await browser.close()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(get_fund_data())
-    except Exception as e:
-        print(f"❌ TEFAS verisi alınamadı: {e}")
-        if os.path.exists(OUTPUT_FILE):
-            os.remove(OUTPUT_FILE)
+    asyncio.run(get_hkh_data())
