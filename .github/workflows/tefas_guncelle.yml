@@ -19,10 +19,9 @@ jobs:
         python-version: 3.11
 
     - name: Gerekli paketleri kur
-      run: pip install -r requirements.txt
-
-    - name: Playwright kurulum
-      run: playwright install
+      run: |
+        pip install -r requirements.txt
+        python -m playwright install chromium
 
     - name: TEFAS verisini çek
       run: python tefas_scraper.py
