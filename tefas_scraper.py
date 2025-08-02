@@ -1,46 +1,51 @@
-import pandas as pd
 import requests
+import pandas as pd
 import datetime
+import os
+import subprocess
 
-# En yakın iş gününü döner (bugün, dün, önceki gün diye gider)
-def get_last_business_day():
-    today = datetime.date.today()
-    while today.weekday() >= 5:  # Cumartesi (5) veya Pazar (6) ise geri git
-        today -= datetime.timedelta(days=1)
-    return today
+# 📅 Bugün hafta sonuysa son iş gününü (Cuma) bul
+bugun = datetime.date.today()
+if bugun.weekday() == 5:  # Cumartesi
+    bugun = bugun - datetime.timedelta(days=1)
+elif bugun.weekday() == 6:  # Pazar
+    bugun = bugun - datetime.timedelta(days=2)
 
-# Tarihi string formatına çevir (örnek: 20250802)
-def date_to_str(date_obj):
-    return date_obj.strftime('%Y%m%d')
+# 📆 Formatla: 20250802 gibi (yıl + ay + gün)
+tarih = bugun.strftime("%Y%m%d")
 
-# En son iş günü tarihi
-date = get_last_business_day()
-date_str = date_to_str(date)
+# 🔗 TEFAS API URL (tarihe göre veri çeker)
+url = f"https://www.tefas.gov.tr/api/DB/BindFundData?date={tarih}"
 
-# TEFAS API uç noktası
-url = f"https://www.tefas.gov.tr/api/DB/OnlineFundData?date={date_str}"
-
-# Veri isteği
-r = requests.get(url)
 try:
+    r = requests.get(url, timeout=10)
+    r.raise_for_status()  # HTTP hatası varsa fırlat
+
     data = r.json()
-except:
-    print("Veri alınamadı veya JSON hatası!")
-    data = []
+    df = pd.DataFrame(data)
 
-# Veriyi DataFrame’e çevir
-df = pd.DataFrame(data)
+    # 📌 Sadece şu sütunları al
+    df = df[["code", "title", "date", "unitPrice"]]
 
-# Eğer veri boşsa, CSV oluşturma
-if df.empty:
-    print(f"❌ Uyarı: TEFAS verisi alınamadı veya veri boş geldi ({date_str})")
+    # 💾 CSV'ye yaz
+    df.to_csv("tefas_gunluk.csv", index=False)
+    print("✅ Veri başarıyla çekildi ve kaydedildi.")
+
+except Exception as e:
+    print(f"❌ Veri çekilirken hata oluştu: {e}")
+    open("tefas_gunluk.csv", "w").close()  # boş dosya oluştur
+    exit(1)
+
+# ✅ Dosya varsa ve boş değilse git işlemlerini yap
+if os.path.exists("tefas_gunluk.csv") and os.path.getsize("tefas_gunluk.csv") > 0:
+    try:
+        subprocess.run("git config --global user.name 'GitHub Action'", shell=True, check=True)
+        subprocess.run("git config --global user.email 'action@github.com'", shell=True, check=True)
+        subprocess.run("git add tefas_gunluk.csv", shell=True, check=True)
+        subprocess.run(f'git commit -m "TEFAS verisi güncellendi: {datetime.datetime.utcnow()}"', shell=True, check=True)
+        subprocess.run("git push", shell=True, check=True)
+        print("✅ Değişiklikler GitHub'a yüklendi.")
+    except subprocess.CalledProcessError:
+        print("⚠️ Dosyada değişiklik yok, git commit yapılmadı.")
 else:
-    # Eğer beklenen sütunlar varsa sadece o sütunları al
-    expected_columns = {"code", "title", "date", "unitPrice"}
-    if expected_columns.issubset(df.columns):
-        df = df[["code", "title", "date", "unitPrice"]]
-        df.columns = ["Kod", "Fon Ünvanı", "Tarih", "Birim Pay Değeri"]
-        df.to_csv("tefas_gunluk.csv", index=False, encoding="utf-8-sig")
-        print("✅ TEFAS verisi başarıyla kaydedildi.")
-    else:
-        print(f"⚠️ Beklenen sütunlar yok, veri formatı değişmiş olabilir.")
+    print("⚠️ tefas_gunluk.csv dosyası boş, push yapılmadı.")
