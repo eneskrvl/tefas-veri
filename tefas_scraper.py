@@ -4,39 +4,40 @@ import datetime
 import os
 import subprocess
 
-# 📅 Bugün hafta sonuysa son iş gününü (Cuma) bul
+# 📅 Bugün hafta sonuysa Cuma'ya çek
 bugun = datetime.date.today()
 if bugun.weekday() == 5:  # Cumartesi
-    bugun = bugun - datetime.timedelta(days=1)
+    bugun -= datetime.timedelta(days=1)
 elif bugun.weekday() == 6:  # Pazar
-    bugun = bugun - datetime.timedelta(days=2)
+    bugun -= datetime.timedelta(days=2)
 
-# 📆 Formatla: 20250802 gibi (yıl + ay + gün)
 tarih = bugun.strftime("%Y%m%d")
-
-# 🔗 TEFAS API URL (tarihe göre veri çeker)
 url = f"https://www.tefas.gov.tr/api/DB/BindFundData?date={tarih}"
 
 try:
     r = requests.get(url, timeout=10)
-    r.raise_for_status()  # HTTP hatası varsa fırlat
-
+    r.raise_for_status()
     data = r.json()
     df = pd.DataFrame(data)
 
-    # 📌 Sadece şu sütunları al
-    df = df[["code", "title", "date", "unitPrice"]]
-
-    # 💾 CSV'ye yaz
-    df.to_csv("tefas_gunluk.csv", index=False)
-    print("✅ Veri başarıyla çekildi ve kaydedildi.")
+    # Beklenen sütunlar var mı kontrol et
+    expected_cols = {"code", "title", "date", "unitPrice"}
+    if expected_cols.issubset(df.columns):
+        df = df[["code", "title", "date", "unitPrice"]]
+        df.columns = ["Kod", "Fon Ünvanı", "Tarih", "Birim Pay Değeri"]
+        df.to_csv("tefas_gunluk.csv", index=False, encoding="utf-8-sig")
+        print("✅ Veri başarıyla kaydedildi.")
+    else:
+        print("⚠️ TEFAS verisi geldi ama beklenen sütunlar yok.")
+        open("tefas_gunluk.csv", "w").close()  # boş dosya
+        exit(0)
 
 except Exception as e:
     print(f"❌ Veri çekilirken hata oluştu: {e}")
-    open("tefas_gunluk.csv", "w").close()  # boş dosya oluştur
-    exit(1)
+    open("tefas_gunluk.csv", "w").close()
+    exit(0)
 
-# ✅ Dosya varsa ve boş değilse git işlemlerini yap
+# ✅ Dosya varsa ve boş değilse commit + push
 if os.path.exists("tefas_gunluk.csv") and os.path.getsize("tefas_gunluk.csv") > 0:
     try:
         subprocess.run("git config --global user.name 'GitHub Action'", shell=True, check=True)
@@ -44,8 +45,8 @@ if os.path.exists("tefas_gunluk.csv") and os.path.getsize("tefas_gunluk.csv") > 
         subprocess.run("git add tefas_gunluk.csv", shell=True, check=True)
         subprocess.run(f'git commit -m "TEFAS verisi güncellendi: {datetime.datetime.utcnow()}"', shell=True, check=True)
         subprocess.run("git push", shell=True, check=True)
-        print("✅ Değişiklikler GitHub'a yüklendi.")
+        print("✅ GitHub'a yüklendi.")
     except subprocess.CalledProcessError:
-        print("⚠️ Dosyada değişiklik yok, git commit yapılmadı.")
+        print("ℹ️ Dosya değişmemiş olabilir, commit yapılmadı.")
 else:
     print("⚠️ tefas_gunluk.csv dosyası boş, push yapılmadı.")
