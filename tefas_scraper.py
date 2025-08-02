@@ -1,49 +1,41 @@
-import requests
-from bs4 import BeautifulSoup
+# tefas_scraper.py
+
+import asyncio
+from playwright.async_api import async_playwright
 import pandas as pd
+from datetime import datetime
 
-# Fon kodu
-fon_kodu = "HKH"
-url = f"https://www.tefas.gov.tr/FonAnaliz.aspx?FonKod={fon_kodu}"
+async def get_fund_data():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        
+        url = "https://www.tefas.gov.tr/FonAnaliz.aspx?FonKod=HKH"
+        await page.goto(url, timeout=60000)
 
-headers = {
-    "User-Agent": "Mozilla/5.0"
-}
+        # Sayfa tamamen yüklensin diye bekle
+        await page.wait_for_selector("#MainContent_PanelPortfoy", timeout=30000)
 
-try:
-    r = requests.get(url, headers=headers)
-    r.encoding = "utf-8"
-    soup = BeautifulSoup(r.text, "html.parser")
+        try:
+            title = await page.inner_text("#MainContent_lblFonUnvani")
+            price = await page.inner_text("#MainContent_FonFiyatBilgi1_lblFiyat")
+            date = await page.inner_text("#MainContent_FonFiyatBilgi1_lblTarih")
+        except Exception as e:
+            print("Veri alınamadı:", e)
+            await browser.close()
+            return
 
-    # 📌 Fon adını çek
-    fon_adi_elem = soup.find("span", {"id": "MainContent_fonunUnvani"})
-    fon_adi = fon_adi_elem.text.strip() if fon_adi_elem else "Fon Adı Bulunamadı"
+        df = pd.DataFrame([{
+            "code": "HKH",
+            "title": title.strip(),
+            "date": date.strip(),
+            "unitPrice": price.strip()
+        }])
 
-    # 📌 Fiyat bilgisi (Birinci tablo)
-    fiyat_elem = soup.find("table", {"id": "MainContent_portfoyBilgileri"}) \
-                     .find_all("tr")[1].find_all("td")[1]
-    fiyat = fiyat_elem.text.strip().replace(".", "").replace(",", ".")
+        df.to_csv("tefas_gunluk.csv", index=False)
+        print("✅ Veri kaydedildi.")
 
-    # 📌 Tarih (valör)
-    tarih_elem = soup.find("table", {"id": "MainContent_portfoyBilgileri"}) \
-                     .find_all("tr")[1].find_all("td")[0]
-    tarih = tarih_elem.text.strip()
+        await browser.close()
 
-    print("✅ Gerçek veri çekildi:", fon_kodu, fon_adi, tarih, fiyat)
-
-    df = pd.DataFrame([{
-        "code": fon_kodu,
-        "title": fon_adi,
-        "date": tarih,
-        "unitPrice": fiyat
-    }])
-
-except Exception as e:
-    print("❌ Hata oluştu, dummy veri yazılıyor:", e)
-    df = pd.DataFrame([
-        {"code": "ABC", "title": "Fon A", "date": "01.08.2025", "unitPrice": "1234.56"},
-        {"code": "XYZ", "title": "Fon B", "date": "01.08.2025", "unitPrice": "789.01"}
-    ])
-
-# CSV dosyasına yaz
-df.to_csv("tefas_gunluk.csv", index=False)
+if __name__ == "__main__":
+    asyncio.run(get_fund_data())
