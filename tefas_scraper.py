@@ -31,14 +31,16 @@ except:
 # Veriyi DataFrame’e çevir
 df = pd.DataFrame(data)
 
-# Eğer veri boşsa, hata vermeden çık
+# Eğer veri boşsa, CSV oluşturma
 if df.empty:
-    print("Uyarı: TEFAS verisi alınamadı veya boş döndü.")
+    print(f"❌ Uyarı: TEFAS verisi alınamadı veya veri boş geldi ({date_str})")
 else:
-    # Sadece istediğin kolonları al
-    df = df[["code", "title", "date", "unitPrice"]]
-    df.columns = ["Kod", "Fon Ünvanı", "Tarih", "Birim Pay Değeri"]
-
-    # CSV dosyasına yaz
-    df.to_csv("tefas_gunluk.csv", index=False, encoding="utf-8-sig")
-    print("✅ tefas_gunluk.csv dosyası başarıyla oluşturuldu.")
+    # Eğer beklenen sütunlar varsa sadece o sütunları al
+    expected_columns = {"code", "title", "date", "unitPrice"}
+    if expected_columns.issubset(df.columns):
+        df = df[["code", "title", "date", "unitPrice"]]
+        df.columns = ["Kod", "Fon Ünvanı", "Tarih", "Birim Pay Değeri"]
+        df.to_csv("tefas_gunluk.csv", index=False, encoding="utf-8-sig")
+        print("✅ TEFAS verisi başarıyla kaydedildi.")
+    else:
+        print(f"⚠️ Beklenen sütunlar yok, veri formatı değişmiş olabilir.")
