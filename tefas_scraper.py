@@ -1,46 +1,41 @@
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
-import time
 
-# TEFAS API URL
-url = "https://www.tefas.gov.tr/api/DB/AllFundDailyValues"
+# En fazla kaç gün geriye gidelim
+MAX_GUN_GERI = 5
 
-# En son veri tarihini bulmak için denenecek maksimum gün sayısı
-max_days = 5
-success = False
+# Bugünden başlayarak geriye doğru deneyelim
+bugun = datetime.now()
+basarili = False
 
-for i in range(max_days):
-    tarih = (datetime.today() - timedelta(days=i)).strftime("%Y-%m-%d")
-    print(f"🔄 Veri deneniyor: {tarih}")
+for i in range(MAX_GUN_GERI):
+    tarih = (bugun - timedelta(days=i)).strftime("%Y-%m-%d")
+    print(f"🔍 {tarih} için veri isteniyor...")
+
+    url = f"https://www.tefas.gov.tr/api/DB/OnemliVeriler/GetFonBilgiListe/{tarih}"
     
     try:
-        response = requests.get(url, params={"date": tarih}, timeout=30)
-        
-        if response.status_code == 200 and response.content.strip():
-            try:
-                data = response.json()
-                df = pd.DataFrame(data)
-                
-                if not df.empty:
-                    df = df[["code", "title", "date", "unitPrice"]]
-                    df.to_csv("tefas_gunluk.csv", index=False)
-                    print(f"✅ Veri başarıyla kaydedildi: {tarih}")
-                    success = True
-                    break
-                else:
-                    print(f"⚠️ {tarih} için veri boş geldi.")
-            except Exception as e:
-                print(f"❌ JSON hatası ({tarih}): {e}")
-        else:
-            print(f"⚠️ HTTP Yanıtı boş veya hatalı ({response.status_code})")
-    
-    except Exception as e:
-        print(f"❌ Bağlantı hatası: {e}")
-    
-    time.sleep(1)
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
 
-if not success:
-    print("❌ Son 5 güne ait veri bulunamadı. Yine de başlıklar yazılıyor.")
-    with open("tefas_gunluk.csv", "w") as f:
-        f.write("code,title,date,unitPrice\n")
+        if isinstance(data, list) and len(data) == 0:
+            print(f"⚠️ {tarih} için veri listesi boş. Bir gün geri gidiliyor...")
+            continue
+
+        df = pd.DataFrame(data)
+
+        if not df.empty:
+            df_filtered = df[["code", "title", "date", "unitPrice"]]
+            df_filtered.to_csv("tefas_gunluk.csv", index=False)
+            print(f"✅ {tarih} verisi başarıyla kaydedildi.")
+            basarili = True
+            break
+        else:
+            print(f"⚠️ {tarih} için DataFrame boş. Devam ediliyor...")
+    except Exception as e:
+        print(f"⛔ {tarih} verisi çekilirken hata oluştu: {e}")
+
+if not basarili:
+    print(f"❌ Son {MAX_GUN_GERI} günde veri bulunamadı.")
