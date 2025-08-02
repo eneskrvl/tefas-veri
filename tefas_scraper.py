@@ -4,13 +4,14 @@ import pandas as pd
 
 async def get_hkh_data():
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)  # DİKKAT: headless=False
+        browser = await p.chromium.launch(headless=True)  # Burada düzeltme yaptık
         page = await browser.new_page()
         await page.goto("https://www.tefas.gov.tr/FonAnaliz.aspx?FonKod=HKH")
 
         try:
             await page.wait_for_selector("#MainContent_portfoyBilgileri", timeout=60000)
 
+            # Tarih ve fiyat çek
             tarih = await page.inner_text("#MainContent_lblTarih")
             fiyat = await page.inner_text("#MainContent_lblBirimPayDegeri")
 
