@@ -1,32 +1,25 @@
 name: TEFAS Verisi Güncelle
 
 on:
-  schedule:
-    - cron: '0 6 * * *'  # Her gün saat 09:00 (Türkiye saatiyle) 
   workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'  # Her sabah 09:00'da çalışır (Türkiye saati)
 
 jobs:
-  run-scraper:
+  build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Repo'yu klonla
-        uses: actions/checkout@v3
+    - name: Repo'yu klonla
+      uses: actions/checkout@v3
 
-      - name: Python yükle
-        uses: actions/setup-python@v3
-        with:
-          python-version: '3.10'
+    - name: Python kur
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-      - name: Gerekli paketleri kur
-        run: pip install pandas requests
+    - name: Bağımlılıkları kur
+      run: pip install -r requirements.txt
 
-      - name: Python script'i çalıştır
-        run: python tefas_scraper.py
-
-      - name: CSV dosyasını commitle
-        run: |
-          git config --global user.name "GitHub Action"
-          git config --global user.email "action@github.com"
-          git add tefas_gunluk.csv
-          git commit -m "TEFAS verisi güncellendi: $(date)"
-          git push
+    - name: Python script'i çalıştır
+      run: python tefas_scraper.py
