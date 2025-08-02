@@ -21,8 +21,8 @@ jobs:
     - name: Gerekli paketleri kur
       run: pip install -r requirements.txt
 
-    - name: Playwright bağımlılıklarını kur
-      run: playwright install --with-deps
+    - name: Playwright kurulum
+      run: playwright install
 
     - name: TEFAS verisini çek
       run: python tefas_scraper.py
