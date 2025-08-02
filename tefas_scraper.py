@@ -1,42 +1,30 @@
-from tefas import Crawler
+import requests
 import pandas as pd
-import datetime
-import os
-import subprocess
+from datetime import datetime, timedelta
 
-try:
-    crawl = Crawler()
-    data = crawl.fetch()
-    df = pd.DataFrame(data)
-
-    if df.empty:
-        print("❌ TEFAS verisi tamamen boş.")
-        open("tefas_gunluk.csv", "w").close()
-        exit(0)
-
-    # 🧠 Son işlem günü verilerini filtrele
-    df["date"] = pd.to_datetime(df["date"])
-    son_tarih = df["date"].max()
-    df = df[df["date"] == son_tarih]
-
-    df.to_csv("tefas_gunluk.csv", index=False, encoding="utf-8-sig")
-    print(f"✅ TEFAS verisi yazıldı: {son_tarih.date()}")
-
-except Exception as e:
-    print(f"❌ Hata oluştu: {e}")
-    open("tefas_gunluk.csv", "w").close()
-    exit(0)
-
-# 🔁 Git işlemleri
-if os.path.exists("tefas_gunluk.csv") and os.path.getsize("tefas_gunluk.csv") > 0:
+def fetch_tefas_data(date_str):
+    url = "https://www.tefas.gov.tr/api/DB/ExchangeTradedFunds"
+    payload = {
+        "date": date_str
+    }
     try:
-        subprocess.run("git config --global user.name 'GitHub Action'", shell=True, check=True)
-        subprocess.run("git config --global user.email 'action@github.com'", shell=True, check=True)
-        subprocess.run("git add tefas_gunluk.csv", shell=True, check=True)
-        subprocess.run(f'git commit -m "TEFAS verisi güncellendi: {datetime.datetime.utcnow()}"', shell=True, check=True)
-        subprocess.run("git push", shell=True, check=True)
-        print("✅ GitHub'a yüklendi.")
-    except subprocess.CalledProcessError:
-        print("ℹ️ Dosyada değişiklik yok.")
+        r = requests.post(url, json=payload, timeout=15)
+        data = r.json()
+        if isinstance(data, list) and len(data) > 0:
+            df = pd.DataFrame(data)
+            df = df[["code", "title", "date", "unitPrice"]]
+            return df
+    except Exception as e:
+        print(f"{date_str} için veri alınamadı. Hata: {e}")
+    return None
+
+# Bugün + geri günler (maksimum 5 gün geriye dön)
+for i in range(5):
+    date_try = (datetime.today() - timedelta(days=i)).strftime("%Y-%m-%d")
+    df = fetch_tefas_data(date_try)
+    if df is not None:
+        df.to_csv("tefas_gunluk.csv", index=False)
+        print(f"Veri bulundu: {date_try} ({len(df)} satır)")
+        break
 else:
-    print("⚠️ CSV dosyası boş, push yapılmadı.")
+    print("Hiçbir günde veri bulunamadı.")
