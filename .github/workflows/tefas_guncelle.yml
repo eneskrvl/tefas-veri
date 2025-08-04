@@ -3,33 +3,33 @@ name: TEFAS Verisi Güncelle
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 6 * * *'  # Her gün 09:00'da (UTC+3)
+    - cron: "0 8 * * *"  # Her sabah 08:00'de (UTC)
 
 jobs:
-  build:
+  run-scraper:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Kodu klonla
-      uses: actions/checkout@v3
+      - name: Kodu klonla
+        uses: actions/checkout@v3
 
-    - name: Python kur
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.11
+      - name: Python kur
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
-    - name: Gerekli paketleri kur
-      run: |
-        pip install -r requirements.txt
-        python -m playwright install chromium
+      - name: Gerekli paketleri kur
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
 
-    - name: TEFAS verisini çek
-      run: python tefas_scraper.py
+      - name: TEFAS verisini çek
+        run: python tefas_scraper.py
 
-    - name: Değişiklikleri commit et
-      run: |
-        git config --global user.name "GitHub Action"
-        git config --global user.email "action@github.com"
-        git add tefas_gunluk.csv
-        git commit -m "TEFAS verisi güncellendi: $(date)" || echo "No changes to commit"
-        git push
+      - name: Değişiklikleri commit et
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git add tefas_gunluk.csv
+          git commit -m "TEFAS verisi güncellendi: $(date)" || echo "No changes to commit"
+          git push
