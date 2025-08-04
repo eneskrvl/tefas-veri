@@ -13,17 +13,14 @@ async def get_hkh_data():
             tarih = await page.inner_text("#MainContent_lblTarih")
             fiyat = await page.inner_text("#MainContent_lblBirimPayDegeri")
 
-            data = {
-                "code": ["HKH"],
-                "title": ["Hedef Portföy Değişken Fon"],
-                "date": [tarih],
-                "unitPrice": [fiyat.replace(",", ".")]
-            }
-
-            df = pd.DataFrame(data)
+            df = pd.DataFrame([{
+                "code": "HKH",
+                "title": "Hedef Portföy Değişken Fon",
+                "date": tarih,
+                "unitPrice": fiyat.replace(",", ".")
+            }])
             df.to_csv("tefas_gunluk.csv", index=False)
             print("✅ CSV yazıldı:", df)
-
         except Exception as e:
             print("❌ Hata:", e)
         finally:
